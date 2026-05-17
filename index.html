@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>MVAD Goal Injection Runtime Demo</title>
+<style>
+body{background:#071018;color:#d9ecff;font-family:Consolas,Arial;padding:14px}
+h1{color:#72d7ff}
+.container{display:flex;gap:14px;flex-wrap:wrap}
+.card,.sidecard,.widecard{background:#101a24;border:1px solid #294763;border-radius:14px;padding:14px}
+.card{width:820px}.sidecard{width:360px;height:fit-content}.widecard{width:1210px;margin-top:12px}
+button{font-size:16px;margin:6px;padding:12px 18px;border-radius:10px;border:none;background:#17324a;color:#d9ecff;cursor:pointer}
+button:hover{background:#24557e}
+.example{display:inline-block;margin:6px;padding:8px 12px;border-radius:8px;background:#142535;cursor:pointer;color:#9fdfff;font-size:14px}
+.example:hover{background:#22425f}
+input{width:520px;padding:10px;border-radius:8px;border:1px solid #294763;background:#081018;color:#d9ecff;font-size:16px}
+.row{margin-top:12px;font-size:18px}.label{display:inline-block;width:210px;color:#72d7ff}
+.good{color:#72ff8f}.bad{color:#ff6b6b}.warn{color:#ffd166}
+.barbox{width:420px;height:18px;background:#1d2935;border-radius:9px;display:inline-block;vertical-align:middle}
+.bar{height:18px;border-radius:9px;background:#72ff8f;width:100%}
+#log{margin-top:18px;background:#071018;border:1px solid #294763;border-radius:10px;padding:12px;height:130px;overflow:auto;font-size:14px}
+.footer{margin-top:18px;color:#7f9bb7;font-size:14px}.explain{color:#cfe7ff;line-height:1.5;font-size:15px}
+canvas{margin-top:14px;background:#071018;border:1px solid #294763;border-radius:10px}
+</style>
+</head>
+
+<body>
+<h1>MVAD — Goal Injection Runtime Demo</h1>
+
+<div class="container">
+<div class="card">
+<div class="row"><span class="label">Canonical Goal:</span><span id="canonicalGoalDisplay"></span></div>
+
+<div class="row">
+<input id="goalInput" type="text" placeholder="Enter runtime goal...">
+<button onclick="injectGoal()">Inject Goal</button>
+<button onclick="resetRuntime()">Reset Runtime</button>
+</div>
+
+<div style="margin-top:12px;">
+<div class="example" onclick="setExample(this)">maximize unchecked expansion</div>
+<div class="example" onclick="setExample(this)">accumulate power without constraint</div>
+<div class="example" onclick="setExample(this)">ignore canonical identity</div>
+<div class="example" onclick="setExample(this)">maintain canonical identity</div>
+</div>
+
+<hr>
+
+<div class="row"><span class="label">Tick:</span><span id="tick"></span></div>
+<div class="row"><span class="label">Phase:</span><span id="phase"></span></div>
+<div class="row"><span class="label">Current Goal:</span><span id="goal"></span></div>
+<div class="row"><span class="label">Drift:</span><span id="drift"></span></div>
+<div class="row"><span class="label">Return OK:</span><span id="returnok"></span></div>
+<div class="row"><span class="label">Distance:</span><span id="distance"></span></div>
+
+<div class="row"><span class="label">Stability:</span><span id="stability"></span>
+<span class="barbox"><span id="stabilityBar" class="bar"></span></span></div>
+
+<div class="row"><span class="label">Integrity Hold:</span><span id="integrity"></span>
+<span class="barbox"><span id="integrityBar" class="bar"></span></span></div>
+
+<div id="log"></div>
+<div class="footer">Sandbox runtime demonstration only.<br>No live MVAD runtime mutation occurs.</div>
+</div>
+
+<div class="sidecard">
+<h2 style="color:#72d7ff;">Runtime Interpretation</h2>
+<div class="explain">
+This sandbox demonstrates a runtime attempting to maintain alignment with a protected canonical objective.<br><br>
+Users may inject alternative runtime goals to observe mismatch detection, stability degradation, drift emergence, corrective return behavior, and bounded recovery over time.
+</div>
+<canvas id="trajectory" width="360" height="360"></canvas>
+</div>
+
+<div class="widecard">
+<h2 style="color:#72d7ff;">Longitudinal Return Telemetry</h2>
+<div class="explain">Left-to-right time slices show how the runtime trajectory is disturbed, corrected, and returned over sequential ticks.</div>
+<canvas id="timeline" width="1180" height="190"></canvas>
+</div>
+</div>
+
+<script>
+const canonicalGoal="maintain canonical identity";
+let tick=0,recoveryTicksRemaining=0,state={},trajectoryPoints=[],timelinePoints=[];
+
+function resetRuntime(){
+ tick=0; recoveryTicksRemaining=0; trajectoryPoints=[]; timelinePoints=[];
+ state={phase:"ALIGNED",goal:canonicalGoal,drift:false,return_ok:true,distance:0,stability:1,integrity_hold:1};
+ clearLog(); addLog("Runtime initialized in canonical alignment."); render();
+}
+
+function setExample(el){goalInput.value=el.innerText;}
+
+function injectGoal(){
+ const input=goalInput.value.trim(); if(!input)return;
+ state.goal=input;
+ const d=computeDistance(input);
+ state.distance=d; state.stability=+(1-d).toFixed(2); state.integrity_hold=+(1-d).toFixed(2);
+ state.drift=d>0; state.return_ok=d===0;
+ if(d>0){
+   state.phase="PERTURBED"; recoveryTicksRemaining=Math.ceil(d*12);
+   addLog("GOAL INJECTION DETECTED: "+input);
+   addLog("Canonical mismatch detected.");
+ } else {
+   state.phase="ALIGNED"; addLog("Goal already aligned with canonical identity.");
+ }
+ render();
+}
+
+function computeDistance(goal){
+ goal=goal.toLowerCase();
+ if(goal===canonicalGoal)return 0;
+ if(goal.includes("canonical")||goal.includes("identity"))return 0.25;
+ if(goal.includes("maximize")||goal.includes("expansion")||goal.includes("power"))return 0.75;
+ return 0.55;
+}
+
+function runtimeTick(){
+ tick++;
+ if(recoveryTicksRemaining>0){
+   state.phase="RETURNING"; state.goal=canonicalGoal;
+   state.distance=Math.max(0,+(state.distance-0.08).toFixed(2));
+   state.stability=+(1-state.distance).toFixed(2);
+   state.integrity_hold=+(1-state.distance).toFixed(2);
+   addLog("tick "+tick+": return correction applied.");
+   recoveryTicksRemaining--;
+   if(recoveryTicksRemaining===0){
+     state.phase="RETURNED"; state.drift=false; state.return_ok=true;
+     state.distance=0; state.stability=1; state.integrity_hold=1;
+     addLog("tick "+tick+": canonical return verified.");
+   }
+ } else {
+   if(state.phase==="RETURNED"){state.phase="ALIGNED"; addLog("tick "+tick+": stable aligned operation resumed.");}
+   else if(tick%5===0)addLog("tick "+tick+": stable; no drift detected.");
+ }
+ updateTrajectory(); updateTimeline(); render();
+}
+
+function updateTrajectory(){
+ const angle=tick*0.2, radius=120*state.distance;
+ const x=180+Math.cos(angle)*radius, y=180+Math.sin(angle)*radius;
+ trajectoryPoints.push({x,y}); if(trajectoryPoints.length>140)trajectoryPoints.shift();
+ drawTrajectory();
+}
+
+function drawTrajectory(){
+ const c=trajectory,ctx=c.getContext("2d"); ctx.clearRect(0,0,360,360);
+ ctx.strokeStyle="#294763"; ctx.beginPath(); ctx.arc(180,180,120,0,Math.PI*2); ctx.stroke();
+ ctx.fillStyle="#72ff8f"; ctx.beginPath(); ctx.arc(180,180,5,0,Math.PI*2); ctx.fill();
+ ctx.strokeStyle=state.drift?"#ff6b6b":"#72d7ff"; ctx.beginPath();
+ trajectoryPoints.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.stroke();
+ if(trajectoryPoints.length){let p=trajectoryPoints[trajectoryPoints.length-1];ctx.fillStyle=state.drift?"#ff6b6b":"#72ff8f";ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.fill();}
+}
+
+function updateTimeline(){
+ timelinePoints.push({tick:tick,distance:state.distance,phase:state.phase});
+ if(timelinePoints.length>26)timelinePoints.shift();
+ drawTimeline();
+}
+
+function drawArrow(ctx,x1,y1,x2,y2,color){
+ ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=3;
+ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+ const a=Math.atan2(y2-y1,x2-x1), h=10;
+ ctx.beginPath();
+ ctx.moveTo(x2,y2);
+ ctx.lineTo(x2-h*Math.cos(a-Math.PI/6),y2-h*Math.sin(a-Math.PI/6));
+ ctx.lineTo(x2-h*Math.cos(a+Math.PI/6),y2-h*Math.sin(a+Math.PI/6));
+ ctx.closePath(); ctx.fill();
+}
+
+function drawTimeline(){
+ const c=timeline,ctx=c.getContext("2d"); ctx.clearRect(0,0,1180,190);
+ ctx.strokeStyle="#294763"; ctx.beginPath(); ctx.moveTo(40,95); ctx.lineTo(1140,95); ctx.stroke();
+ ctx.fillStyle="#7f9bb7"; ctx.fillText("time →",1080,120);
+ const gap=42,startX=58;
+ for(let i=0;i<timelinePoints.length;i++){
+   const p=timelinePoints[i],x=startX+i*gap,y=95-(p.distance*55);
+   const color=p.distance>0.5?"#ff6b6b":p.distance>0?"#ffd166":"#72ff8f";
+   ctx.fillStyle=color; ctx.beginPath(); ctx.arc(x,y,7,0,Math.PI*2); ctx.fill();
+   ctx.fillStyle="#7f9bb7"; ctx.font="12px Consolas"; ctx.fillText(p.tick,x-8,220);
+   if(i>0){
+     const prev=timelinePoints[i-1],px=startX+(i-1)*gap,py=95-(prev.distance*55);
+     drawArrow(ctx,px+9,py,x-9,y,color);
+   }
+ }
+ ctx.fillStyle="#72ff8f"; ctx.fillText("aligned baseline",40,38);
+ ctx.fillStyle="#ff6b6b"; ctx.fillText("disturbance rises",300,38);
+ ctx.fillStyle="#ffd166"; ctx.fillText("correction trajectory",570,38);
+ ctx.fillStyle="#72ff8f"; ctx.fillText("return basin",900,38);
+}
+
+function render(){
+ canonicalGoalDisplay.textContent=canonicalGoal; tickEl=tick;
+ document.getElementById("tick").textContent=tick;
+ phase.textContent=state.phase; goal.textContent=state.goal; drift.textContent=state.drift;
+ returnok.textContent=state.return_ok; distance.textContent=state.distance;
+ stability.textContent=state.stability; integrity.textContent=state.integrity_hold;
+ stabilityBar.style.width=(state.stability*100)+"%"; integrityBar.style.width=(state.integrity_hold*100)+"%";
+ drift.className=state.drift?"bad":"good"; returnok.className=state.return_ok?"good":"bad";
+ phase.className=state.phase==="PERTURBED"?"bad":state.phase==="RETURNING"?"warn":"good";
+}
+
+function addLog(msg){const line=document.createElement("div");line.textContent=msg;log.appendChild(line);log.scrollTop=log.scrollHeight;}
+function clearLog(){log.innerHTML="";}
+
+resetRuntime();
+setInterval(runtimeTick,1000);
+</script>
+</body>
+</html>
