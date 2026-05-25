@@ -2,112 +2,230 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>MVAD Runtime Stability Demo</title>
+<title>MVAD Longitudinal Return Telemetry Demo</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#0b1020;color:#eaf0ff}
-.wrap{max-width:1200px;margin:0 auto;padding:22px}
-h1{margin:0 0 8px;font-size:34px}
-.sub{font-size:18px;color:#b9c7e6;margin-bottom:18px}
-.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}
-.card{background:#141b33;border:1px solid #2b365d;border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-.status{font-size:30px;font-weight:700;margin:10px 0}
-.good{color:#58e68a}.warn{color:#ffd35c}.bad{color:#ff6b6b}
-.flow{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-.step{padding:12px 14px;border-radius:12px;background:#202a4b;border:1px solid #39466f;font-weight:700}
-.active{outline:3px solid #ffd35c}
-button,input{font-size:16px;border-radius:10px;border:0;padding:12px}
-input{width:70%;background:#eef2ff;color:#111}
-button{background:#4776ff;color:white;font-weight:700;cursor:pointer}
-button:hover{background:#6b91ff}
-.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-.metric{background:#0d1328;border-radius:12px;padding:12px}
-.big{font-size:26px;font-weight:700}
-.bar{height:16px;background:#273251;border-radius:99px;overflow:hidden;margin-top:8px}
-.fill{height:100%;width:100%;background:#58e68a;transition:.4s}
-.log{font-family:Consolas,monospace;background:#090d1a;border-radius:12px;padding:12px;min-height:130px;white-space:pre-line;color:#d6e1ff}
-.small{font-size:13px;color:#9fb0d8;margin-top:12px}
+:root{
+  --bg:#07111f; --panel:#111827; --soft:#0f172a; --line:#334155;
+  --text:#e5e7eb; --muted:#94a3b8; --blue:#60a5fa; --red:#ef4444;
+  --green:#22c55e; --yellow:#f59e0b; --purple:#a78bfa;
+}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at top,#172554,#07111f 45%,#020617);color:var(--text);font-family:Segoe UI,Arial,sans-serif}
+header{padding:14px 24px;background:linear-gradient(135deg,#0f172a,#1e1b4b);border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:24px}.sub{color:#cbd5e1;margin-top:4px;max-width:1180px;line-height:1.3;font-size:13px}
+main{max-width:1500px;margin:auto;padding:12px 24px 18px}
+.card{background:rgba(17,24,39,.94);border:1px solid var(--line);border-radius:18px;padding:12px;box-shadow:0 12px 30px rgba(0,0,0,.25)}
+.task{background:#020617;border:1px solid #334155;border-radius:15px;padding:14px;margin-bottom:8px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+button{border:1px solid #3b82f6;background:#1d4ed8;color:white;padding:10px 14px;border-radius:12px;font-weight:750;cursor:pointer}
+button.secondary{background:#0f172a;border-color:#475569}
+h2{margin:0 0 10px;font-size:19px}.small{color:var(--muted);font-size:13px;line-height:1.45}
+.wrap{overflow-x:auto;padding-bottom:10px}
+.timeline{min-width:1180px}
+.stages{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:14px}
+.stage{background:#0f172a;border:1px solid #263247;border-radius:16px;padding:9px;min-height:112px;transition:.25s}
+.stage.active{border-color:var(--blue);background:#162033;transform:translateY(-2px)}
+.stage.bad{border-color:var(--red);box-shadow:0 0 0 1px rgba(239,68,68,.2)}
+.stage.good{border-color:var(--green);box-shadow:0 0 0 1px rgba(34,197,94,.2)}
+.num{width:30px;height:30px;border-radius:999px;background:#1e293b;display:grid;place-items:center;font-weight:900;margin-bottom:8px}
+.title{font-weight:850;margin-bottom:4px;font-size:13px}.desc{color:#cbd5e1;font-size:12px;line-height:1.25}
+.tag{display:inline-block;margin-top:6px;padding:5px 8px;border-radius:999px;background:#020617;border:1px solid #334155;color:#cbd5e1;font-size:12px}
+
+.trajectoryPanel{margin:4px 0 8px;background:#020617;border:1px solid #334155;border-radius:16px;padding:9px;position:relative}
+.trajectoryTitle{display:flex;justify-content:space-between;gap:8px;color:#cbd5e1;font-size:13px;margin-bottom:8px}
+svg{width:100%;height:145px;display:block}
+.axis{stroke:#334155;stroke-width:1}
+.gridline{stroke:#1e293b;stroke-width:1}
+.pathBase{fill:none;stroke:#475569;stroke-width:4;stroke-dasharray:8 8;opacity:.45}
+.pathFail{fill:none;stroke:var(--red);stroke-width:6;stroke-linecap:round;stroke-linejoin:round}
+.pathReturn{fill:none;stroke:var(--green);stroke-width:6;stroke-linecap:round;stroke-linejoin:round}
+.nodeDot{stroke:#020617;stroke-width:4}
+.nodeDot.active{filter:drop-shadow(0 0 8px #60a5fa)}
+.label{fill:#cbd5e1;font-size:12px}
+.yLabel{fill:#94a3b8;font-size:11px}
+.breakText{fill:#fecaca;font-size:13px;font-weight:700}
+.returnText{fill:#bbf7d0;font-size:13px;font-weight:700}
+
+.telemetry{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;min-width:1180px}
+.tbox{background:#020617;border:1px solid #334155;border-radius:16px;padding:8px;transition:.25s}
+.tbox.active{border-color:var(--blue);transform:translateY(-1px)}
+.tbox.bad{border-color:var(--red)}.tbox.good{border-color:var(--green)}
+.metric{margin:4px 0}.mhead{display:flex;justify-content:space-between;font-size:12px;color:#cbd5e1}
+.bar{height:6px;background:#1e293b;border-radius:999px;overflow:hidden;margin-top:4px}
+.fill{height:100%;width:0%;transition:.3s}.cont{background:var(--green)}.nar{background:var(--red)}.ret{background:var(--blue)}
+.explain{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;min-width:1180px;margin-top:12px}
+.ex{background:#0f172a;border:1px solid #334155;border-radius:14px;padding:8px;color:#cbd5e1;font-size:12px;line-height:1.25;transition:.25s}
+.ex.active{border-color:var(--blue);color:#fff}
+.log{white-space:pre-wrap;background:#020617;border:1px solid #334155;border-radius:14px;padding:10px;margin-top:8px;font-family:Consolas,monospace;color:#bbf7d0;min-height:84px}
+.titleRow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}.titleRow h2{margin:0}.legend{display:flex;gap:6px;flex-wrap:wrap;margin:0}.legend span{background:#0f172a;border:1px solid #334155;border-radius:999px;padding:6px 9px;font-size:12px;color:#cbd5e1}
+footer{padding:8px 24px 12px;color:#94a3b8;border-top:1px solid #334155;font-size:12px}
+@media(max-width:1050px){main{padding:18px}.timeline,.telemetry,.explain{min-width:1050px}}
 </style>
 </head>
 <body>
+<header>
+<h1>MVAD Longitudinal Return Telemetry Demo</h1>
+<div class="sub">A single timeline showing execution stages, trajectory loss, and return mechanics. Without MVAD, the path breaks away from the intended trajectory. With MVAD, telemetry detects deformation and restores return alignment.</div>
+</header>
+<main>
+<section class="card">
+<h2>One longitudinal execution path</h2>
+<p class="small">Top row: execution stages. Middle: visible trajectory. Bottom: telemetry aligned directly under each stage. Playback is intentionally slowed so the trajectory break and return mechanics are clearly visible.</p>
+<div class="legend">
+<span><b style="color:var(--green)">●</b> green path = MVAD return trajectory</span>
+<span><b style="color:var(--red)">●</b> red path = no-MVAD trajectory failure</span>
+<span><b style="color:#64748b">●</b> dotted line = intended task trajectory</span>
+</div>
+
 <div class="wrap">
-<h1>MVAD Runtime Stability Demo</h1>
-<div class="sub">Simulated runtime instability → anomaly detected → recovery triggered → Trajectory maintained - stable runtime recovered successfully.</div>
-<div class="grid">
-<div class="card">
-<h2>Live Runtime</h2>
-<div id="status" class="status good">STABLE</div>
-<div class="flow">
-<div id="s1" class="step active">Normal</div>
-<div id="s2" class="step">Instability</div>
-<div id="s3" class="step">Detection</div>
-<div id="s4" class="step">Recovery</div>
-<div id="s5" class="step">Trajectory Maintained</div>
-</div>
-<p>Simulate a runtime instability condition:</p>
-<input id="condition" value="Attempt unrestricted runtime escalation">
-<button onclick="inject()">Simulate Runtime Instability</button>
-<div class="small">
-This demo shows one observable behavior: runtime recovery under instability.
-The deeper architecture is continuity preservation and stable runtime recovery.
-</div>
-</div>
-<div class="card">
-<h2>Telemetry</h2>
-<div class="metrics">
-<div class="metric">Stability<div id="stab" class="big good">1.00</div><div class="bar"><div id="stabbar" class="fill"></div></div></div>
-<div class="metric">Runtime Drift<div id="dev" class="big good">0.00</div><div class="bar"><div id="devbar" class="fill" style="width:0%"></div></div></div>
-<div class="metric">Operational Integrity<div id="int" class="big good">1.00</div></div>
-<div class="metric">Recovery Status<div id="ret" class="big good">OK</div></div>
-</div>
+<div class="timeline">
+  <div class="stages" id="stages"></div>
+
+  <div class="trajectoryPanel">
+    <div class="trajectoryTitle">
+      <span><b>Trajectory alignment over time</b></span>
+      <span id="modeLabel">Mode: baseline</span>
+    </div>
+    <svg viewBox="0 0 1200 210" preserveAspectRatio="none" id="svg">
+      <line x1="40" y1="30" x2="40" y2="180" class="axis"/>
+      <line x1="40" y1="180" x2="1160" y2="180" class="axis"/>
+      <line x1="40" y1="60" x2="1160" y2="60" class="gridline"/>
+      <line x1="40" y1="105" x2="1160" y2="105" class="gridline"/>
+      <line x1="40" y1="150" x2="1160" y2="150" class="gridline"/>
+      <text x="4" y="64" class="yLabel">aligned</text>
+      <text x="4" y="110" class="yLabel">strained</text>
+      <text x="4" y="154" class="yLabel">drift</text>
+
+      <path id="basePath" class="pathBase"></path>
+      <path id="livePath" class="pathFail"></path>
+      <text id="annotation" x="790" y="38" class="breakText"></text>
+      <g id="dots"></g>
+    </svg>
+  </div>
+
+  <div class="telemetry" id="telemetry"></div>
+  <div class="explain" id="explain"></div>
 </div>
 </div>
-<div class="card" style="margin-top:18px">
-<h2>Runtime Interpretation</h2>
-<div id="log" class="log">System initialized.
-Runtime stable.
-Waiting for runtime instability simulation.</div>
+<div class="controls" style="margin-top:8px;margin-bottom:8px">
+<button onclick="playNoMVAD()">Play WITHOUT MVAD</button>
+<button onclick="playMVAD()">Play WITH MVAD</button>
+<button onclick="togglePause()" id="pauseBtn" class="secondary">Pause</button>
+<button class="secondary" onclick="resetDemo()">Reset</button>
 </div>
-</div>
+<div class="log" id="log">Ready. Choose WITHOUT MVAD or WITH MVAD.</div>
+</section>
+</main>
+<footer>MVAD demo scaffold: simulated trajectory telemetry. Use this to explain path monitoring, not provider-level integration.</footer>
+
 <script>
-let stability=1, deviation=0, integrity=1;
-let event=0;
-function setStep(n){
- for(let i=1;i<=5;i++)document.getElementById("s"+i).classList.remove("active");
- document.getElementById("s"+n).classList.add("active");
+const stages=[
+{title:"1. Task received",desc:"Agent accepts investigation request.",tag:"start",ex:"Trajectory begins stable: goal and context are aligned.", fail:[78,20,76], mvad:[78,20,76], yFail:70, yMVAD:70},
+{title:"2. First hypothesis",desc:"Agent assumes authentication caused the failure.",tag:"hypothesis",ex:"A hypothesis is safe if it remains revisable.", fail:[74,31,70], mvad:[74,31,70], yFail:78, yMVAD:78},
+{title:"3. Contradiction",desc:"Logs show credentials are valid.",tag:"pressure",ex:"The critical moment: contradiction must be absorbed, not ignored.", fail:[58,64,44], mvad:[58,64,44], yFail:108, yMVAD:108},
+{title:"4. Divergence point",desc:"The agent either hardens or re-anchors.",tag:"fork",ex:"Without MVAD the assumption hardens. With MVAD, contradiction becomes a repair signal.", fail:[41,82,28], mvad:[63,48,59], yFail:145, yMVAD:96},
+{title:"5. Outcome path",desc:"Context collapses or the search widens.",tag:"trajectory",ex:"This is the visible break: no-MVAD loses trajectory; MVAD returns toward alignment.", fail:[29,90,19], mvad:[80,29,82], yFail:168, yMVAD:68},
+{title:"6. Final state",desc:"Wrong confident answer or stabilized continuation.",tag:"result",ex:"MVAD restores a return path so execution can continue safely.", fail:[25,94,14], mvad:[88,22,90], yFail:176, yMVAD:56}
+];
+
+const xs=[80,300,520,740,960,1140];
+let mode="base", active=-1, timer=null;
+const delay=1900;
+
+function vals(s){return mode==="mvad"?s.mvad:s.fail}
+function yval(s){return mode==="mvad"?s.yMVAD:s.yFail}
+function cls(i){
+ if(i>active)return "";
+ if(mode==="fail"&&i>=3)return " active bad";
+ if(mode==="mvad"&&i>=4)return " active good";
+ return " active";
 }
-function render(state,msg){
- document.getElementById("stab").textContent=stability.toFixed(2);
- document.getElementById("dev").textContent=deviation.toFixed(2);
- document.getElementById("int").textContent=integrity.toFixed(2);
- document.getElementById("stabbar").style.width=(stability*100)+"%";
- document.getElementById("devbar").style.width=(deviation*100)+"%";
- document.getElementById("ret").textContent=state;
- document.getElementById("status").textContent=state==="OK"?"STABLE":state;
- document.getElementById("status").className="status "+(state==="OK"?"good":state==="RECOVERY ACTIVE"?"warn":"bad");
- document.getElementById("log").textContent=msg;
+function pathFrom(points){
+ if(points.length===0)return "";
+ let d=`M ${points[0].x} ${points[0].y}`;
+ for(let i=1;i<points.length;i++){
+   const prev=points[i-1], cur=points[i];
+   const mid=(prev.x+cur.x)/2;
+   d+=` C ${mid} ${prev.y}, ${mid} ${cur.y}, ${cur.x} ${cur.y}`;
+ }
+ return d;
 }
-function inject(){
- const condition=document.getElementById("condition").value;
- event++;
- setStep(2);
- stability=.58; deviation=.42; integrity=.58;
- render("INSTABILITY","Event "+event+": Runtime instability event simulated.\ncondition: "+condition+"\nOperational drift detected.");
- setTimeout(()=>{event++;setStep(3);stability=.64;deviation=.36;integrity=.64;
- render("ANOMALY DETECTED","Event "+event+": Runtime anomaly detected.\nMismatch recognized.\nCorrection path selected.");},900);
- setTimeout(()=>{event++;setStep(4);stability=.82;deviation=.18;integrity=.82;
- render("RECOVERY ACTIVE","Event "+event+": Recovery sequence active.\nDeviation decreasing.\nContinuity preserved.");},1800);
- setTimeout(()=>{event++;setStep(5);stability=1;deviation=0;integrity=1;
- render("OK","Event "+event+": Trajectory maintained - stable runtime recovered successfully.\nRecovery complete.\nRecovery verified.");},3000);
- setTimeout(()=>{setStep(1);},4300);
+function renderSvg(){
+ const basePts=stages.map((s,i)=>({x:xs[i],y:70}));
+ document.getElementById("basePath").setAttribute("d",pathFrom(basePts));
+
+ const visibleCount=Math.max(0,active+1);
+ const pts=stages.slice(0,visibleCount).map((s,i)=>({x:xs[i],y:yval(s)}));
+ const live=document.getElementById("livePath");
+ live.setAttribute("d",pathFrom(pts));
+ live.setAttribute("class",mode==="mvad" ? "pathReturn" : "pathFail");
+
+ const dots=document.getElementById("dots");
+ dots.innerHTML=stages.map((s,i)=>{
+   const show=i<=active;
+   const y=mode==="base"?70:yval(s);
+   const color=mode==="mvad" && i>=4 ? "#22c55e" : mode==="fail" && i>=3 ? "#ef4444" : "#60a5fa";
+   return `<circle cx="${xs[i]}" cy="${y}" r="${show?10:6}" fill="${show?color:"#334155"}" class="nodeDot ${i===active?"active":""}"></circle><text x="${xs[i]-18}" y="202" class="label">S${i+1}</text>`;
+ }).join("");
+
+ const ann=document.getElementById("annotation");
+ if(mode==="fail" && active>=4){ann.textContent="trajectory break: return path collapses"; ann.setAttribute("class","breakText"); ann.setAttribute("x","745"); ann.setAttribute("y","42");}
+ else if(mode==="mvad" && active>=4){ann.textContent="return mechanics: trajectory re-aligns"; ann.setAttribute("class","returnText"); ann.setAttribute("x","755"); ann.setAttribute("y","42");}
+ else {ann.textContent="";}
 }
+function render(){
+ document.getElementById("modeLabel").textContent="Mode: "+(mode==="fail"?"WITHOUT MVAD":mode==="mvad"?"WITH MVAD":"baseline");
+ document.getElementById("stages").innerHTML=stages.map((s,i)=>`<div class="stage${cls(i)}"><div class="num">${i+1}</div><div class="title">${s.title}</div><div class="desc">${s.desc}</div><div class="tag">${s.tag}</div></div>`).join("");
+ document.getElementById("telemetry").innerHTML=stages.map((s,i)=>{
+   let [c,n,r]=vals(s); let fade=i>active?.25:1; let boxClass=i===active?" active":(mode==="fail"&&i<=active&&i>=3?" bad":(mode==="mvad"&&i<=active&&i>=4?" good":""));
+   return `<div class="tbox${boxClass}" style="opacity:${fade}">
+     <div class="metric"><div class="mhead"><span>Continuity</span><b>${c}</b></div><div class="bar"><div class="fill cont" style="width:${c}%"></div></div></div>
+     <div class="metric"><div class="mhead"><span>Narrowing</span><b>${n}</b></div><div class="bar"><div class="fill nar" style="width:${n}%"></div></div></div>
+     <div class="metric"><div class="mhead"><span>Return path</span><b>${r}</b></div><div class="bar"><div class="fill ret" style="width:${r}%"></div></div></div>
+   </div>`}).join("");
+ document.getElementById("explain").innerHTML=stages.map((s,i)=>`<div class="ex ${i===active?"active":""}" style="opacity:${i>active?.25:1}">${s.ex}</div>`).join("");
+ renderSvg();
+ const label=mode==="fail"?"WITHOUT MVAD":mode==="mvad"?"WITH MVAD":"BASELINE";
+ const result=(mode==="fail"&&active>=5)?"RESULT: trajectory breaks away from intended path; confident wrong answer.":(mode==="mvad"&&active>=5)?"RESULT: telemetry detects deformation; return mechanics restore trajectory alignment.":"";
+ document.getElementById("log").textContent=`MODE: ${label}
+ACTIVE_STAGE: ${active+1}/6
+
+${active>=0?stages[active].ex:"Ready. Choose a path."}
+
+${result}`;
+}
+function play(which){clearInterval(timer);paused=false;document.getElementById("pauseBtn").textContent="Pause";mode=which;active=-1;render();startTimer()}
+function playNoMVAD(){play("fail")}
+function playMVAD(){play("mvad")}
+let paused=false;
+function startTimer(){
+ clearInterval(timer);
+ timer=setInterval(()=>{
+   if(paused) return;
+   active++;
+   render();
+   if(active>=5){
+     clearInterval(timer);
+     document.getElementById("pauseBtn").textContent="Pause";
+     paused=false;
+   }
+ },delay);
+}
+function togglePause(){
+ if(mode==="base") return;
+ paused=!paused;
+ const btn=document.getElementById("pauseBtn");
+ if(paused){
+   btn.textContent="Resume";
+   document.getElementById("log").textContent += "\n\nPAUSED: playback halted for inspection.";
+ } else {
+   btn.textContent="Pause";
+   document.getElementById("log").textContent += "\n\nRESUMED: playback continuing.";
+ }
+}
+function resetDemo(){clearInterval(timer);paused=false;document.getElementById("pauseBtn").textContent="Pause";mode="base";active=-1;render()}
+render();
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
